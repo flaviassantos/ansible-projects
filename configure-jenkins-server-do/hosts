@@ -1,0 +1,6 @@
+[jenkins_server]
+142.93.160.96
+
+[jenkins_server:vars]
+ansible_ssh_private_key_file=~/.ssh/id_rsa
+ansible_user=root
