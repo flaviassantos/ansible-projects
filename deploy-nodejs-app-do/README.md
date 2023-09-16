@@ -10,7 +10,7 @@ Modules used:
 ### Setting Up the Environment
 
 1. **Create a Digital Ocean Droplet with Terraform**
-   - source code [here]().
+   - source code [here](https://github.com/flaviassantos/terraform-projects/tree/master/simple-digital-ocean-droplet).
 
 2. **Ansible Inventory**:
    - In the Ansible inventory file (hosts), add the IP address of the new droplet.
