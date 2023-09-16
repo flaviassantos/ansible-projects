@@ -1,0 +1,6 @@
+version: 1.0.0
+location: ~/github/simple-nodejs-app/
+linux_name: fss
+user_home_dir: /home/{{linux_name}}
+
+docker_password: xxxxx

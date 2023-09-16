@@ -1,0 +1,49 @@
+---
+- name: Install node and npm
+  hosts: droplet
+  tasks:
+    - name: Update apt repo and cache
+      ansible.builtin.apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+    - name: Install nodejs and npm
+      ansible.builtin.apt:
+        pkg:
+          - nodejs
+          - npm
+
+
+- name: Create new linux user for node app
+  hosts: droplet
+  vars_files:
+    - project-vars
+  tasks:
+    - name: Create linux user
+      ansible.builtin.user:
+        name: "{{linux_name}}"
+        comment: Node User
+        group: admin
+
+
+- name: Deploy nodejs app
+  hosts: droplet
+  become: True
+  become_user: "{{linux_name}}"
+  vars_files:
+    - project-vars
+  tasks:
+    - name: Unpack the nodejs file
+      ansible.builtin.unarchive:
+        src: "{{location}}/nodejs-app-{{version}}.tgz"
+        dest: "{{user_home_dir}}"
+    - name: Install dependencies
+      community.general.npm:
+        path: "{{user_home_dir}}/package"
+    - name: Start the application
+      ansible.builtin.command:
+        chdir: "{{user_home_dir}}/package/app"
+        cmd: node server
+      async: 1000
+      poll: 0
+    - name: Ensure app is running
+      ansible.builtin.shell: ps aux | grep node
+      register: app_status
+    - ansible.builtin.debug: msg={{app_status.stdout_lines}}
