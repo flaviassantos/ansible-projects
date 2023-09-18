@@ -1,0 +1,93 @@
+---
+- name: Wait for ssh connection
+  hosts: all
+  gather_facts: False
+  tasks:
+    - name: Ensure ssh port open
+      ansible.builtin.wait_for:
+        port: 22
+        delay: 10
+        timeout: 100
+        search_regex: OpenSSH
+        host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+      vars:
+        ansible_connection: local
+        ansible_python_interpreter: /usr/bin/python3 # already a default python interpreter
+
+- name: Install python3, docker, docker-compose
+  hosts: all
+  become: yes
+  gather_facts: False
+  tasks:
+    - name: Install python3 and docker
+#      vars:
+#        ansible_python_interpreter: /usr/bin/python # python3 is already available
+      ansible.builtin.yum:
+        name:
+          - python3
+          - docker
+        update_cache: yes
+        state: present
+    - name: Get architecture of remote machine
+      shell: uname -m
+      # shell: echo `uname -s`-`uname -m`
+      register: remote_arch
+    - name: Install Docker-compose
+      ansible.builtin.get_url:
+        url: "https://github.com/docker/compose/releases/latest/download/docker-compose-Linux-{{ remote_arch.stdout }}"
+        dest: /usr/local/bin/docker-compose
+        mode: '+x'
+    - name: Start docker daemon
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+    - name: Install docker python module
+      ansible.builtin.pip:
+        name:
+          - docker
+          - docker-compose
+
+- name: Update openssl and install compatible version of urllib3
+  hosts: all
+  become: yes
+  tasks:
+    - name: Reconnect to server session
+      ansible.builtin.meta: reset_connection
+    - name: Update OpenSSL
+      ansible.builtin.yum:
+        name: openssl
+        state: latest
+    - name: Install compatible version of urllib3
+      ansible.builtin.pip:
+        name: urllib3==1.26.7
+
+- name: Create new linux user
+  hosts: all
+  vars_files:
+    - project-vars-docker
+  become: yes
+  tasks:
+    - name: Create new linux user
+      ansible.builtin.user:
+        name: "{{linux_name}}"
+        groups: adm,docker
+
+- name: Start docker containers
+  hosts: all
+  become: yes
+  become_user: fss
+  vars_files:
+    - project-vars-docker
+  tasks:
+    - name: Copy docker compose
+      ansible.builtin.copy:
+        src: "{{docker_compose_file}}"
+        dest: "{{user_home_dir}}/docker-compose.yaml"
+    - name: Docker login
+      community.docker.docker_login:
+        registry_url: https://index.docker.io/v1/
+        username: flaviassantos
+        password: "{{docker_password}}"
+    - name: Start container from compose
+      community.docker.docker_compose:
+        project_src: "{{user_home_dir}}"
